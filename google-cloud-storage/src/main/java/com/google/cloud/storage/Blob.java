@@ -292,10 +292,8 @@ public class Blob extends BlobInfo {
     if (Files.isDirectory(path)) {
       throw new StorageException(0, path + ": Is a directory");
     }
-    try {
-      try (InputStream input = Files.newInputStream(path)) {
-        uploadFrom(input, chunkSize, options);
-      }
+    try (InputStream input = Files.newInputStream(path)) {
+      uploadFrom(input, chunkSize, options);
     } catch (IOException e) {
       throw new StorageException(e);
     }
