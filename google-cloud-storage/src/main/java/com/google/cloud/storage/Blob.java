@@ -275,7 +275,7 @@ public class Blob extends BlobInfo {
 
   /**
    * Uploads the given file path to this blob using specified blob write options and the provided
-   * chunk size. The default chunk size is 2*1024*1024. Larger chunk sizes may improve the upload
+   * chunk size. The default chunk size is 2MB. Larger chunk sizes may improve the upload
    * performance but require more memory. It could cause OutOfMemoryError or add significant garbage
    * collection overhead. Chunk sizes which are less than 256*1024 are not allowed, they will be
    * treated as 256*1024.
@@ -314,7 +314,7 @@ public class Blob extends BlobInfo {
 
   /**
    * Uploads the given content to this blob using specified blob write options and the provided
-   * chunk size. The default chunk size is 2*1024*1024. Larger chunk sizes may improve the upload
+   * chunk size. The default chunk size is 2MB. Larger chunk sizes may improve the upload
    * performance but require more memory. It could cause OutOfMemoryError or add significant garbage
    * collection overhead. Chunk sizes which are less than 256*1024 are not allowed, they will be
    * treated as 256*1024.
