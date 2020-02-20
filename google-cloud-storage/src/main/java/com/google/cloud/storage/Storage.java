@@ -2495,6 +2495,9 @@ public interface Storage extends Service<StorageOptions> {
    *     SignUrlOption.signWith(ServiceAccountCredentials.fromStream(new FileInputStream(kfPath))));
    * }</pre>
    *
+   * <p>Note that the {@link ServiceAccountSigner} may require additional configuration to enable
+   * URL signing. See the documentation for the implementation for more details.
+   *
    * <p>Example of creating a signed URL for a blob with generation.
    *
    * <pre>{@code
@@ -2507,9 +2510,6 @@ public interface Storage extends Service<StorageOptions> {
    *     7, TimeUnit.DAYS,
    *     SignUrlOption.withQueryParams(ImmutableMap.of("generation", "" + generation)));
    * }</pre>
-   *
-   * <p>Note that the {@link ServiceAccountSigner} may require additional configuration to enable
-   * URL signing. See the documentation for the implementation for more details.
    *
    * @param blobInfo the blob associated with the signed URL
    * @param duration time until the signed URL expires, expressed in {@code unit}. The finest
