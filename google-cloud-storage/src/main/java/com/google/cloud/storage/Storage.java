@@ -2508,7 +2508,7 @@ public interface Storage extends Service<StorageOptions> {
    * URL signedUrl = storage.signUrl(
    *     BlobInfo.newBuilder(bucketName, blobName, generation).build(),
    *     7, TimeUnit.DAYS,
-   *     SignUrlOption.withQueryParams(ImmutableMap.of("generation", "" + generation)));
+   *     SignUrlOption.withQueryParams(ImmutableMap.of("generation", String.valueOf(generation))));
    * }</pre>
    *
    * @param blobInfo the blob associated with the signed URL
