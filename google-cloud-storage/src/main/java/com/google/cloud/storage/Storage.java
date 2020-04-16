@@ -1992,8 +1992,8 @@ public interface Storage extends Service<StorageOptions> {
    * Updates the blob properties if the preconditions specified by {@code options} are met. The
    * property update works as described in {@link #update(BlobInfo)}.
    *
-   * <p>{@code options} parameter allows to specify the preconditions for applying the update. E.g.
-   * update of the blob properties might be required only if the properties have not been updated
+   * <p>{@code options} parameter can contain the preconditions for applying the update. E.g. update
+   * of the blob properties might be required only if the properties have not been updated
    * externally. {@code StorageException} with the code {@code 412} is thrown if preconditions fail.
    *
    * <p>Example of updating the content type only if the properties are not updated externally:
