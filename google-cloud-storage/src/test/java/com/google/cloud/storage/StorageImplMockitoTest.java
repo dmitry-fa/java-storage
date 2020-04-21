@@ -18,7 +18,6 @@ package com.google.cloud.storage;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -460,13 +459,7 @@ public class StorageImplMockitoTest {
 
   private void verifyUpload(UploadParameters parameters) {
     verify(storageRpcMock)
-        .write(
-            eq(parameters.uploadId),
-            eq(parameters.buffer),
-            eq(0),
-            eq(0L),
-            eq(parameters.length),
-            eq(parameters.isLast));
+        .write(parameters.uploadId, parameters.buffer, 0, 0L, parameters.length, parameters.isLast);
   }
 
   @Test
@@ -475,7 +468,6 @@ public class StorageImplMockitoTest {
     Path tempFile = Files.createTempFile("testUpload", ".tmp");
     Files.write(tempFile, dataToSend);
 
-    byte[] dataToSend2 = {1, 2, 3, 4, 5};
     UploadParameters uploadParameters = initializeUpload(dataToSend);
     storage.upload(uploadParameters.blobInfo, tempFile);
     verifyUpload(uploadParameters);
@@ -553,7 +545,7 @@ public class StorageImplMockitoTest {
     Exception runtimeException = new RuntimeException("message");
     doThrow(runtimeException)
         .when(storageRpcMock)
-        .write(eq(uploadId), eq(buffer), eq(0), eq(0L), eq(bytes.length), eq(true));
+        .write(uploadId, buffer, 0, 0L, bytes.length, true);
 
     InputStream input = new ByteArrayInputStream(bytes);
     try {
@@ -582,13 +574,10 @@ public class StorageImplMockitoTest {
 
     byte[] buffer1 = new byte[MIN_BUFFER_SIZE];
     System.arraycopy(dataToSend, 0, buffer1, 0, MIN_BUFFER_SIZE);
-    verify(storageRpcMock)
-        .write(eq(uploadId), eq(buffer1), eq(0), eq(0L), eq(MIN_BUFFER_SIZE), eq(false));
+    verify(storageRpcMock).write(uploadId, buffer1, 0, 0L, MIN_BUFFER_SIZE, false);
 
     byte[] buffer2 = new byte[MIN_BUFFER_SIZE];
     System.arraycopy(dataToSend, MIN_BUFFER_SIZE, buffer2, 0, extraBytes);
-    verify(storageRpcMock)
-        .write(
-            eq(uploadId), eq(buffer2), eq(0), eq((long) MIN_BUFFER_SIZE), eq(extraBytes), eq(true));
+    verify(storageRpcMock).write(uploadId, buffer2, 0, (long) MIN_BUFFER_SIZE, extraBytes, true);
   }
 }
