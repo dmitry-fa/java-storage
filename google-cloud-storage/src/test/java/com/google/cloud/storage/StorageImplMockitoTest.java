@@ -18,6 +18,7 @@ package com.google.cloud.storage;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -51,7 +52,6 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Map;
 import javax.crypto.spec.SecretKeySpec;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -402,7 +402,7 @@ public class StorageImplMockitoTest {
     String fileName = "non_existing_file.txt";
     try {
       storage.upload(BLOB_INFO1, Paths.get(fileName));
-      Assert.fail();
+      fail();
     } catch (IOException e) {
       assertEquals(NoSuchFileException.class, e.getClass());
       assertEquals(fileName, e.getMessage());
@@ -415,7 +415,7 @@ public class StorageImplMockitoTest {
     Path dir = Files.createTempDirectory("unit_");
     try {
       storage.upload(BLOB_INFO1, dir);
-      Assert.fail();
+      fail();
     } catch (StorageException e) {
       assertEquals(dir + " is a directory", e.getMessage());
     }
@@ -550,7 +550,7 @@ public class StorageImplMockitoTest {
     InputStream input = new ByteArrayInputStream(bytes);
     try {
       storage.upload(info, input, MIN_BUFFER_SIZE);
-      Assert.fail();
+      fail();
     } catch (StorageException e) {
       assertSame(runtimeException, e.getCause());
     }
