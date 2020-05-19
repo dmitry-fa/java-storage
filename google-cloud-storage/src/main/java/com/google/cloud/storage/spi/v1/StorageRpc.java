@@ -340,6 +340,13 @@ public interface StorageRpc extends ServiceRpc {
   RewriteResponse continueRewrite(RewriteResponse previousResponse);
 
   /**
+   * Aborts the given resumable upload.
+   *
+   * @throws StorageException upon failure
+   */
+  void abort(String uploadId);
+
+  /**
    * Returns the ACL entry for the specified entity on the specified bucket or {@code null} if not
    * found.
    *

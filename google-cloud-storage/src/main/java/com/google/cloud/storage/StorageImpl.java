@@ -40,14 +40,9 @@ import com.google.api.services.storage.model.ObjectAccessControl;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.api.services.storage.model.TestIamPermissionsResponse;
 import com.google.auth.ServiceAccountSigner;
-import com.google.cloud.BaseService;
-import com.google.cloud.BatchResult;
-import com.google.cloud.PageImpl;
+import com.google.cloud.*;
 import com.google.cloud.PageImpl.NextPageFetcher;
-import com.google.cloud.Policy;
-import com.google.cloud.ReadChannel;
 import com.google.cloud.RetryHelper.RetryHelperException;
-import com.google.cloud.Tuple;
 import com.google.cloud.storage.Acl.Entity;
 import com.google.cloud.storage.HmacKey.HmacKeyMetadata;
 import com.google.cloud.storage.PostPolicyV4.ConditionV4Type;
@@ -635,6 +630,15 @@ final class StorageImpl extends BaseService<StorageOptions> implements Storage {
   private BlobWriteChannel writer(BlobInfo blobInfo, BlobTargetOption... options) {
     final Map<StorageRpc.Option, ?> optionsMap = optionMap(blobInfo, options);
     return new BlobWriteChannel(getOptions(), blobInfo, optionsMap);
+  }
+
+  @Override
+  public void abort(WriteChannel channel) {
+    if (!(channel instanceof BlobWriteChannel)) {
+      throw new IllegalArgumentException("channel is not created by Storage");
+    }
+    BlobWriteChannel blobWriteChannel = (BlobWriteChannel)channel;
+    blobWriteChannel.abort();
   }
 
   @Override
