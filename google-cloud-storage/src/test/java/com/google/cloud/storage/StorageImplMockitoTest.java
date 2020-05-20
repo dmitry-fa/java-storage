@@ -17,20 +17,22 @@
 package com.google.cloud.storage;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.google.api.core.ApiClock;
-import com.google.cloud.Identity;
-import com.google.cloud.Policy;
-import com.google.cloud.ServiceOptions;
+import com.google.cloud.*;
 import com.google.cloud.storage.spi.StorageRpcFactory;
 import com.google.cloud.storage.spi.v1.StorageRpc;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.BaseEncoding;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -40,11 +42,14 @@ import java.security.spec.EncodedKeySpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 import java.util.Map;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 public class StorageImplMockitoTest {
 
@@ -358,11 +363,25 @@ public class StorageImplMockitoTest {
     publicKey = keyFactory.generatePublic(publicKeySpec);
   }
 
+  private static final RuntimeException UNEXPECTED_CALL_EXCEPTION =
+      new RuntimeException("Unexpected call");
+  private static final Answer UNEXPECTED_CALL_ANSWER =
+      new Answer<Object>() {
+        @Override
+        public Object answer(InvocationOnMock invocation) {
+          throw new IllegalArgumentException(
+              "Unexpected call of "
+                  + invocation.getMethod()
+                  + " with "
+                  + Arrays.toString(invocation.getArguments()));
+        };
+      };
+
   @Before
   public void setUp() {
-    rpcFactoryMock = mock(StorageRpcFactory.class);
-    storageRpcMock = mock(StorageRpc.class);
-    when(rpcFactoryMock.create(any(StorageOptions.class))).thenReturn(storageRpcMock);
+    rpcFactoryMock = mock(StorageRpcFactory.class, UNEXPECTED_CALL_ANSWER);
+    storageRpcMock = mock(StorageRpc.class, UNEXPECTED_CALL_ANSWER);
+    doReturn(storageRpcMock).when(rpcFactoryMock).create(any(StorageOptions.class));
     options =
         StorageOptions.newBuilder()
             .setProjectId("projectId")
@@ -395,9 +414,9 @@ public class StorageImplMockitoTest {
 
   @Test
   public void testCreateBucket() {
-    when(storageRpcMock.create(BUCKET_INFO1.toPb(), EMPTY_RPC_OPTIONS))
-        .thenReturn(BUCKET_INFO1.toPb())
-        .thenThrow(new RuntimeException("Fail"));
+    doReturn(BUCKET_INFO1.toPb())
+        .when(storageRpcMock)
+        .create(BUCKET_INFO1.toPb(), EMPTY_RPC_OPTIONS);
     initializeService();
     Bucket bucket = storage.create(BUCKET_INFO1);
     assertEquals(expectedBucket1, bucket);
@@ -405,12 +424,141 @@ public class StorageImplMockitoTest {
 
   @Test
   public void testCreateBucketWithOptions() {
-    when(storageRpcMock.create(BUCKET_INFO1.toPb(), BUCKET_TARGET_OPTIONS))
-        .thenReturn(BUCKET_INFO1.toPb())
-        .thenThrow(new RuntimeException("Fail"));
+    doReturn(BUCKET_INFO1.toPb())
+        .when(storageRpcMock)
+        .create(BUCKET_INFO1.toPb(), BUCKET_TARGET_OPTIONS);
     initializeService();
     Bucket bucket =
         storage.create(BUCKET_INFO1, BUCKET_TARGET_METAGENERATION, BUCKET_TARGET_PREDEFINED_ACL);
     assertEquals(expectedBucket1, bucket);
+  }
+
+  @Test
+  public void testReader() {
+    initializeService();
+    ReadChannel channel = storage.reader(BUCKET_NAME1, BLOB_NAME1);
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+  }
+
+  @Test
+  public void testReaderWithOptions() throws IOException {
+    byte[] result = new byte[DEFAULT_CHUNK_SIZE];
+    doReturn(Tuple.of("etag", result))
+        .when(storageRpcMock)
+        .read(BLOB_INFO2.toPb(), BLOB_SOURCE_OPTIONS, 0, DEFAULT_CHUNK_SIZE);
+    initializeService();
+    ReadChannel channel =
+        storage.reader(
+            BUCKET_NAME1, BLOB_NAME2, BLOB_SOURCE_GENERATION, BLOB_SOURCE_METAGENERATION);
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+    channel.read(ByteBuffer.allocate(42));
+  }
+
+  @Test
+  public void testReaderWithDecryptionKey() throws IOException {
+    byte[] result = new byte[DEFAULT_CHUNK_SIZE];
+    doReturn(Tuple.of("a", result), Tuple.of("b", result))
+        .doThrow(UNEXPECTED_CALL_EXCEPTION)
+        .when(storageRpcMock)
+        .read(BLOB_INFO2.toPb(), ENCRYPTION_KEY_OPTIONS, 0, DEFAULT_CHUNK_SIZE);
+    initializeService();
+    ReadChannel channel =
+        storage.reader(BUCKET_NAME1, BLOB_NAME2, Storage.BlobSourceOption.decryptionKey(KEY));
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+    channel.read(ByteBuffer.allocate(42));
+    channel =
+        storage.reader(
+            BUCKET_NAME1, BLOB_NAME2, Storage.BlobSourceOption.decryptionKey(BASE64_KEY));
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+    channel.read(ByteBuffer.allocate(42));
+  }
+
+  @Test
+  public void testReaderWithOptionsFromBlobId() throws IOException {
+    byte[] result = new byte[DEFAULT_CHUNK_SIZE];
+    doReturn(Tuple.of("etag", result))
+        .doThrow(UNEXPECTED_CALL_EXCEPTION)
+        .when(storageRpcMock)
+        .read(BLOB_INFO1.getBlobId().toPb(), BLOB_SOURCE_OPTIONS, 0, DEFAULT_CHUNK_SIZE);
+    initializeService();
+    ReadChannel channel =
+        storage.reader(
+            BLOB_INFO1.getBlobId(),
+            BLOB_SOURCE_GENERATION_FROM_BLOB_ID,
+            BLOB_SOURCE_METAGENERATION);
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+    channel.read(ByteBuffer.allocate(42));
+  }
+
+  @Test
+  public void testWriter() {
+    BlobInfo.Builder infoBuilder = BLOB_INFO1.toBuilder();
+    BlobInfo infoWithHashes = infoBuilder.setMd5(CONTENT_MD5).setCrc32c(CONTENT_CRC32C).build();
+    BlobInfo infoWithoutHashes = infoBuilder.setMd5(null).setCrc32c(null).build();
+    doReturn("upload-id")
+        .doThrow(UNEXPECTED_CALL_EXCEPTION)
+        .when(storageRpcMock)
+        .open(infoWithoutHashes.toPb(), EMPTY_RPC_OPTIONS);
+    initializeService();
+    WriteChannel channel = storage.writer(infoWithHashes);
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+  }
+
+  @Test
+  public void testWriterWithOptions() {
+    BlobInfo info = BLOB_INFO1.toBuilder().setMd5(CONTENT_MD5).setCrc32c(CONTENT_CRC32C).build();
+    doReturn("upload-id")
+        .doThrow(UNEXPECTED_CALL_EXCEPTION)
+        .when(storageRpcMock)
+        .open(info.toPb(), BLOB_TARGET_OPTIONS_CREATE);
+    initializeService();
+    WriteChannel channel =
+        storage.writer(
+            info,
+            BLOB_WRITE_METAGENERATION,
+            BLOB_WRITE_NOT_EXIST,
+            BLOB_WRITE_PREDEFINED_ACL,
+            BLOB_WRITE_CRC2C,
+            BLOB_WRITE_MD5_HASH);
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+  }
+
+  @Test
+  public void testWriterWithEncryptionKey() {
+    BlobInfo info = BLOB_INFO1.toBuilder().setMd5(null).setCrc32c(null).build();
+    doReturn("upload-id-1", "upload-id-2")
+        .doThrow(UNEXPECTED_CALL_EXCEPTION)
+        .when(storageRpcMock)
+        .open(info.toPb(), ENCRYPTION_KEY_OPTIONS);
+    initializeService();
+    WriteChannel channel = storage.writer(info, Storage.BlobWriteOption.encryptionKey(KEY));
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+    channel = storage.writer(info, Storage.BlobWriteOption.encryptionKey(BASE64_KEY));
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+  }
+
+  @Test
+  public void testWriterWithKmsKeyName() {
+    BlobInfo info = BLOB_INFO1.toBuilder().setMd5(null).setCrc32c(null).build();
+    doReturn("upload-id-1", "upload-id-2")
+        .doThrow(UNEXPECTED_CALL_EXCEPTION)
+        .when(storageRpcMock)
+        .open(info.toPb(), KMS_KEY_NAME_OPTIONS);
+    initializeService();
+    WriteChannel channel = storage.writer(info, Storage.BlobWriteOption.kmsKeyName(KMS_KEY_NAME));
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+    channel = storage.writer(info, Storage.BlobWriteOption.kmsKeyName(KMS_KEY_NAME));
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
   }
 }
