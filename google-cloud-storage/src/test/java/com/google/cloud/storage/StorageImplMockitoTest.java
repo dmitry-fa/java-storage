@@ -16,12 +16,14 @@
 
 package com.google.cloud.storage;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.any;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
 import com.google.api.core.ApiClock;
@@ -53,6 +55,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
@@ -368,6 +371,9 @@ public class StorageImplMockitoTest {
     publicKey = keyFactory.generatePublic(publicKeySpec);
   }
 
+  private static final RuntimeException STORAGE_FAILURE =
+      new RuntimeException("Something went wrong");
+
   private static final RuntimeException UNEXPECTED_CALL_EXCEPTION =
       new RuntimeException("Unexpected call");
   private static final Answer UNEXPECTED_CALL_ANSWER =
@@ -386,7 +392,7 @@ public class StorageImplMockitoTest {
   public void setUp() {
     rpcFactoryMock = mock(StorageRpcFactory.class, UNEXPECTED_CALL_ANSWER);
     storageRpcMock = mock(StorageRpc.class, UNEXPECTED_CALL_ANSWER);
-    doReturn(storageRpcMock).when(rpcFactoryMock).create(any(StorageOptions.class));
+    doReturn(storageRpcMock).when(rpcFactoryMock).create(Mockito.any(StorageOptions.class));
     options =
         StorageOptions.newBuilder()
             .setProjectId("projectId")
@@ -441,17 +447,48 @@ public class StorageImplMockitoTest {
   }
 
   @Test
+  public void testCreateBucketFailure() {
+    doThrow(STORAGE_FAILURE).when(storageRpcMock).create(BUCKET_INFO1.toPb(), EMPTY_RPC_OPTIONS);
+    initializeService();
+    try {
+      storage.create(BUCKET_INFO1);
+      fail();
+    } catch (StorageException e) {
+      assertEquals(STORAGE_FAILURE, e.getCause());
+    }
+  }
+
+  private void verifyChannelRead(ReadChannel channel, byte[] bytes) throws IOException {
+    assertNotNull(channel);
+    assertTrue(channel.isOpen());
+
+    ByteBuffer buffer = ByteBuffer.allocate(42);
+    byte[] expectedBytes = new byte[buffer.capacity()];
+    System.arraycopy(bytes, 0, expectedBytes, 0, bytes.length);
+
+    int size = channel.read(buffer);
+    assertEquals(bytes.length, size);
+    assertEquals(bytes.length, buffer.position());
+    assertArrayEquals(expectedBytes, buffer.array());
+  }
+
+  @Test
   public void testReader() {
     initializeService();
     ReadChannel channel = storage.reader(BUCKET_NAME1, BLOB_NAME1);
     assertNotNull(channel);
     assertTrue(channel.isOpen());
+    // Storage.reader() does not issue any RPC, channel.read() does
+    try {
+      channel.read(ByteBuffer.allocate(100));
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("java.lang.IllegalArgumentException: Unexpected call"));
+    }
   }
 
   @Test
   public void testReaderWithOptions() throws IOException {
-    byte[] result = new byte[DEFAULT_CHUNK_SIZE];
-    doReturn(Tuple.of("etag", result))
+    doReturn(Tuple.of("etag", BLOB_CONTENT))
         .doThrow(UNEXPECTED_CALL_EXCEPTION)
         .when(storageRpcMock)
         .read(BLOB_INFO2.toPb(), BLOB_SOURCE_OPTIONS, 0, DEFAULT_CHUNK_SIZE);
@@ -459,36 +496,29 @@ public class StorageImplMockitoTest {
     ReadChannel channel =
         storage.reader(
             BUCKET_NAME1, BLOB_NAME2, BLOB_SOURCE_GENERATION, BLOB_SOURCE_METAGENERATION);
-    assertNotNull(channel);
-    assertTrue(channel.isOpen());
-    channel.read(ByteBuffer.allocate(42));
+    verifyChannelRead(channel, BLOB_CONTENT);
   }
 
   @Test
   public void testReaderWithDecryptionKey() throws IOException {
-    byte[] result = new byte[DEFAULT_CHUNK_SIZE];
-    doReturn(Tuple.of("a", result), Tuple.of("b", result))
+    doReturn(Tuple.of("a", BLOB_CONTENT), Tuple.of("b", BLOB_SUB_CONTENT))
         .doThrow(UNEXPECTED_CALL_EXCEPTION)
         .when(storageRpcMock)
         .read(BLOB_INFO2.toPb(), ENCRYPTION_KEY_OPTIONS, 0, DEFAULT_CHUNK_SIZE);
     initializeService();
     ReadChannel channel =
         storage.reader(BUCKET_NAME1, BLOB_NAME2, Storage.BlobSourceOption.decryptionKey(KEY));
-    assertNotNull(channel);
-    assertTrue(channel.isOpen());
-    channel.read(ByteBuffer.allocate(42));
+
+    verifyChannelRead(channel, BLOB_CONTENT);
     channel =
         storage.reader(
             BUCKET_NAME1, BLOB_NAME2, Storage.BlobSourceOption.decryptionKey(BASE64_KEY));
-    assertNotNull(channel);
-    assertTrue(channel.isOpen());
-    channel.read(ByteBuffer.allocate(42));
+    verifyChannelRead(channel, BLOB_SUB_CONTENT);
   }
 
   @Test
   public void testReaderWithOptionsFromBlobId() throws IOException {
-    byte[] result = new byte[DEFAULT_CHUNK_SIZE];
-    doReturn(Tuple.of("etag", result))
+    doReturn(Tuple.of("etag", BLOB_CONTENT))
         .doThrow(UNEXPECTED_CALL_EXCEPTION)
         .when(storageRpcMock)
         .read(BLOB_INFO1.getBlobId().toPb(), BLOB_SOURCE_OPTIONS, 0, DEFAULT_CHUNK_SIZE);
@@ -498,9 +528,24 @@ public class StorageImplMockitoTest {
             BLOB_INFO1.getBlobId(),
             BLOB_SOURCE_GENERATION_FROM_BLOB_ID,
             BLOB_SOURCE_METAGENERATION);
+    verifyChannelRead(channel, BLOB_CONTENT);
+  }
+
+  @Test
+  public void testReaderFailure() throws IOException {
+    doThrow(STORAGE_FAILURE)
+        .when(storageRpcMock)
+        .read(BLOB_INFO2.getBlobId().toPb(), EMPTY_RPC_OPTIONS, 0, DEFAULT_CHUNK_SIZE);
+    initializeService();
+    ReadChannel channel = storage.reader(BUCKET_NAME1, BLOB_NAME2);
     assertNotNull(channel);
     assertTrue(channel.isOpen());
-    channel.read(ByteBuffer.allocate(42));
+    try {
+      channel.read(ByteBuffer.allocate(42));
+      fail();
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains(STORAGE_FAILURE.toString()));
+    }
   }
 
   @Test
@@ -568,5 +613,20 @@ public class StorageImplMockitoTest {
     channel = storage.writer(info, Storage.BlobWriteOption.kmsKeyName(KMS_KEY_NAME));
     assertNotNull(channel);
     assertTrue(channel.isOpen());
+  }
+
+  @Test
+  public void testWriterFailure() {
+    BlobInfo.Builder infoBuilder = BLOB_INFO1.toBuilder();
+    BlobInfo infoWithHashes = infoBuilder.setMd5(CONTENT_MD5).setCrc32c(CONTENT_CRC32C).build();
+    BlobInfo infoWithoutHashes = infoBuilder.setMd5(null).setCrc32c(null).build();
+    doThrow(STORAGE_FAILURE).when(storageRpcMock).open(infoWithoutHashes.toPb(), EMPTY_RPC_OPTIONS);
+    initializeService();
+    try {
+      storage.writer(infoWithHashes);
+      fail();
+    } catch (StorageException e) {
+      assertSame(STORAGE_FAILURE, e.getCause());
+    }
   }
 }
