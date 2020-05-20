@@ -420,6 +420,7 @@ public class StorageImplMockitoTest {
   @Test
   public void testCreateBucket() {
     doReturn(BUCKET_INFO1.toPb())
+        .doThrow(UNEXPECTED_CALL_EXCEPTION)
         .when(storageRpcMock)
         .create(BUCKET_INFO1.toPb(), EMPTY_RPC_OPTIONS);
     initializeService();
@@ -430,6 +431,7 @@ public class StorageImplMockitoTest {
   @Test
   public void testCreateBucketWithOptions() {
     doReturn(BUCKET_INFO1.toPb())
+        .doThrow(UNEXPECTED_CALL_EXCEPTION)
         .when(storageRpcMock)
         .create(BUCKET_INFO1.toPb(), BUCKET_TARGET_OPTIONS);
     initializeService();
@@ -450,6 +452,7 @@ public class StorageImplMockitoTest {
   public void testReaderWithOptions() throws IOException {
     byte[] result = new byte[DEFAULT_CHUNK_SIZE];
     doReturn(Tuple.of("etag", result))
+        .doThrow(UNEXPECTED_CALL_EXCEPTION)
         .when(storageRpcMock)
         .read(BLOB_INFO2.toPb(), BLOB_SOURCE_OPTIONS, 0, DEFAULT_CHUNK_SIZE);
     initializeService();
