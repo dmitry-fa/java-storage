@@ -481,6 +481,7 @@ public class StorageImplMockitoTest {
     // Storage.reader() does not issue any RPC, channel.read() does
     try {
       channel.read(ByteBuffer.allocate(100));
+      fail();
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("java.lang.IllegalArgumentException: Unexpected call"));
     }
