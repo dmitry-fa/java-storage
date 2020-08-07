@@ -3477,6 +3477,23 @@ public class ITStorageTest {
   }
 
   @Test
+  public void testAbort() throws IOException {
+    BlobId blobId = BlobId.of(BUCKET, "abortedObject");
+    WriteChannel writer = storage.writer(BlobInfo.newBuilder(blobId).build());
+    writer.write(ByteBuffer.wrap(BLOB_BYTE_CONTENT));
+    storage.abort(writer);
+    writer.write(ByteBuffer.wrap(BLOB_BYTE_CONTENT));
+    try {
+      writer.close();
+      fail();
+    } catch (StorageException e) {
+      assertEquals(499, e.getCode());
+      assertTrue(e.getMessage().startsWith("499 Client Closed Request"));
+    }
+    assertNull(storage.get(blobId));
+  }
+
+  @Test
   public void testRemoveBucketCORS() throws ExecutionException, InterruptedException {
     String bucketName = RemoteStorageHelper.generateBucketName();
     List<Cors.Origin> origins = ImmutableList.of(Cors.Origin.of("http://cloud.google.com"));
