@@ -3479,7 +3479,7 @@ public class ITStorageTest {
   @Test
   public void testAbort() throws IOException {
     BlobId blobId = BlobId.of(BUCKET, "abortedObject");
-    int chunkSize =  256 * 1024;
+    int chunkSize = 256 * 1024;
     WriteChannel writer = storage.writer(BlobInfo.newBuilder(blobId).build());
     writer.setChunkSize(chunkSize);
     writer.write(ByteBuffer.wrap(BLOB_BYTE_CONTENT));
