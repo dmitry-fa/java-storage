@@ -31,4 +31,9 @@
         <className>com/google/cloud/storage/spi/v1/StorageRpc</className>
         <method>void abort(java.lang.String)</method>
     </difference>
+    <difference>
+        <className>com/google/cloud/storage/BucketInfo$Builder</className>
+        <method>com.google.cloud.storage.BucketInfo$Builder setUpdateTime(java.lang.Long)</method>
+        <differenceType>7013</differenceType>
+    </difference>
 </differences>
