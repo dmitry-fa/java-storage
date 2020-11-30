@@ -18,6 +18,7 @@ package com.google.cloud.storage;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
@@ -1884,7 +1885,7 @@ public class StorageImplMockitoTest {
     CopyWriter writer = storage.copy(request);
     assertEquals(42L, writer.getBlobSize());
     assertEquals(21L, writer.getTotalBytesCopied());
-    assertTrue(!writer.isDone());
+    assertFalse(writer.isDone());
   }
 
   @Test
