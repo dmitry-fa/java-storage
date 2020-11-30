@@ -1914,7 +1914,7 @@ public class StorageImplMockitoTest {
     CopyWriter writer = storage.copy(request);
     assertEquals(42L, writer.getBlobSize());
     assertEquals(21L, writer.getTotalBytesCopied());
-    assertTrue(!writer.isDone());
+    assertFalse(writer.isDone());
   }
 
   @Test
